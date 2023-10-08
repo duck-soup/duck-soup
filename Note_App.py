@@ -16,6 +16,10 @@ The idea is to create a note taking app that will be able to:
 - MD viewer                   [DONE]
 - Emojis Picker               [DONE]
 - Automatic Icon Page         [DONE]
+- Use AI to process text      [DONE]
+- Use AI to generate text     [DONE]
+- Use AI to answer questions  [DONE]
+- Use AI to summarize text    [DONE]
 
 ------------------------------------------------------------
 - Change the vault password   [NOT DONE]
@@ -730,7 +734,7 @@ class GraphPanel(wx.Panel):
         self.draw()
 
 
-class LastWordFrame(wx.Frame):
+class DuckSoupApp(wx.Frame):
     def __init__(self, parent, title):
         self.size = wx.DisplaySize()
         self.size = (int(self.size[0]*0.8), int(self.size[1]*0.8))
@@ -1463,8 +1467,10 @@ class LastWordFrame(wx.Frame):
     # ----------------- UI -----------------
     def MainBar(self): # create the navigation bar 
         ''' 
+
         This function creates a navigation bar.
         | File    | Settings               | [DONE] / [DONE]
+        
         -----------------------------------
         | New     | Settings               | [DONE] / [DONE]
         | Open    | Select Vault           | [DONE] / [NOT DONE]
@@ -1544,7 +1550,10 @@ class LastWordFrame(wx.Frame):
 
     # ------------------ MAIN LOOP ------------------
     def InitUI(self): # create the UI - main loop
-
+        '''
+        Here we define the logic of the UI. 
+        And we create the main loop.
+        '''
         self.MainBar()
         self.configurations()
         panel_main = wx.Panel(self)
@@ -1580,11 +1589,9 @@ class LastWordFrame(wx.Frame):
         self.browser = webview.WebView.New(panel_main , size = (180,300))
         # set the margin of the browser
         self.browser.Hide()
-
         self.text_editor_sizer.Add(self.browser, 1, wx.EXPAND)
 
         # hide the browser
-
         self.show_browser = wx.Button(panel_main, label = 'Markdown', size = (100,30))
         def button_show_browser(event):
             if self.browser.IsShown():
@@ -1607,6 +1614,7 @@ class LastWordFrame(wx.Frame):
         self.show_browser.Bind(wx.EVT_BUTTON,button_show_browser)
 
         button_full_markdown = wx.Button(panel_main, label = 'Full Markdown', size = (100,30))
+        
         def button_full_markdown_(event):
             # show button to markdown
             self.text_editor_sizer.Show(self.show_browser)
@@ -1834,5 +1842,5 @@ class LastWordFrame(wx.Frame):
     # -----------------------------------------------   
 if __name__ == '__main__':
     app = wx.App()
-    LastWordFrame(None, title='duck-soup')
+    DuckSoupApp(None, title='duck-soup')
     app.MainLoop()
