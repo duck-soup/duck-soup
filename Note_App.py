@@ -818,7 +818,7 @@ class DuckSoupApp(wx.Frame):
         except FileNotFoundError:
             # create a new config file with default values
             config = {
-                'home_dir': '/Users/robertoscalas/Desktop/tests',
+                'home_dir': '',
                 'list_file_background_color': 'white',
                 'list_file_foreground_color': 'black',
                 'list_words_background_color': 'white',
