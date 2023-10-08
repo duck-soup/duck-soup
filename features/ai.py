@@ -85,7 +85,7 @@ class NLP:
    
 if __name__ == "__main__":
     # test all methods
-    nlp = NLP('duck-soup', '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')
+    nlp = NLP('duck-soup', '__INSERT_YOUR_OPENAI_API_KEY_HERE__')
     prompt = "The quick brown fox jumps over the lazy red dog. The dog is red."
     summary = nlp.summarize(prompt)
     generated = nlp.generate_text(prompt)

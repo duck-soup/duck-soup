@@ -31,8 +31,8 @@ wcpython
 # TextEditor
 With this editor open source you can scrape data from the web, you can summarize and paraphrase text.
 
- - Command + S: Save
-- Command + A: Summarise
+- Command + S: Save
+-  Command + A: Summarise
 - Command + O: Open-file
 - Command + N: New-file
 - Command + Q: Exit
