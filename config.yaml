@@ -1,0 +1,16 @@
+home_dir: /Users/robertoscalas/Desktop/tests
+list_file_background_color: white
+list_file_foreground_color: black
+list_words_background_color: white
+list_words_foreground_color: black
+openai_key: 
+panel_background_color: white
+qa_model: OpenAI
+summarizer_model: OpenAI
+text_ctrl_1_background_color: white
+text_ctrl_1_foreground_color: black
+text_ctrl_background_color: white
+text_ctrl_foreground_color: black
+text_generation_model: OpenAI
+text_summary_background_color: white
+text_summary_foreground_color: black

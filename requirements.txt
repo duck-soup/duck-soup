@@ -1,0 +1,15 @@
+pandas 
+numpy
+networkx
+matplotlib
+scipy
+torch
+transformers
+nltk
+requests
+bs4
+wxpython 
+markdown2
+tdqm
+markdown-checklist
+openai
