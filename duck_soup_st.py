@@ -299,8 +299,25 @@ class DuckSoup_st:
     
     def ChatFeatures(self):
 
+        # get open_ai_key from the config file
+        try:
+            open_ai_key = st.session_state.open_ai_key
+        except:
+            open_ai_key = st.text_input(
+            "Please enter your OpenAI API key", type="password")
+            if st.button("Save key"):
+                # save to config file
+                with open('config.yaml', 'r') as f:
+                    config = yaml.safe_load(f)
+                config['openai_key'] = open_ai_key
+                with open('config.yaml', 'w') as f:
+                    yaml.dump(config, f)
 
-        st.session_state.open_ai_key = st.secrets['OPENAI_KEY']
+            # save as session state
+            st.session_state.open_ai_key = open_ai_key
+
+
+
         def get_pdf_text(pdf_docs):
             text = ""
             for pdf in pdf_docs:

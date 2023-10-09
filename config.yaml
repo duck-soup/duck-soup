@@ -1,5 +1,5 @@
 home_dir: vault_test
-openai_key: null
+openai_key: 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
 qa_model: OpenAI
 summarizer_model: OpenAI
 text_generation_model: OpenAI
