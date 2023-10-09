@@ -3,7 +3,6 @@ Here I'm implementing the application with streamlit that should allow us a bett
 and translation to the web app format.
 
 '''
-
 import streamlit as st
 import yaml
 import os
@@ -15,12 +14,44 @@ from streamlit_ace import KEYBINDINGS
 from utils import get_random_title
 import streamlit.components.v1 as components
 from streamlit_calendar import calendar
+from dotenv import load_dotenv
+from PyPDF2 import PdfReader
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.embeddings import OpenAIEmbeddings, HuggingFaceInstructEmbeddings
+from langchain.vectorstores import FAISS
+from langchain.chat_models import ChatOpenAI
+from langchain.memory import ConversationBufferMemory
+from langchain.chains import ConversationalRetrievalChain
+from utils import css, bot_template, user_template
+from langchain.llms import HuggingFaceHub
 
 st.set_page_config(layout="wide")
 
 class DuckSoup_st:
     def __init__(self):
-        pass
+        load_dotenv()
+        st.write(css, unsafe_allow_html=True)
+
+        if "conversation" not in st.session_state:
+            st.session_state.conversation = None
+        if "chat_history" not in st.session_state:
+            st.session_state.chat_history = None
+
+    def init_css(self):
+        css = '''               
+            <style>
+                .markdown-text-container {
+                    color: black;
+                    background-color: beige;
+                    width: 100%;
+                    height: 100%;
+                    padding: 10px;
+                    border-radius: 10px;
+                    border: 1px transparent;
+                    overflow-y: scroll;
+                }
+            </style>'''
+        st.write(css, unsafe_allow_html=True)
 
     def configurations(self):
         '''
@@ -134,16 +165,16 @@ class DuckSoup_st:
         return content
 
     def text_editor(self):
-        # divide the screen in two parts
-        # left side is the text editor
-        # right side is the markdown preview
-
+        self.init_css()
         c1,c2 = st.tabs([f'Text Editor', f'Markdown Preview'])
         with c1:
             text = st_ace(placeholder=self.selected_file, value = self.open_selected_file(), height=500)
         with c2:
-            st.markdown(text)
-
+            css_for_markdown = '''
+                <div class="markdown-text-container">
+                 {{text}}
+            '''
+            st.markdown(css_for_markdown.replace('{{text}}',text), unsafe_allow_html=True)
         self.text = text
 
     def OnNew(self):                     # When the user clicks on the NEW-BUTTON or presses Ctrl+N
@@ -266,6 +297,87 @@ class DuckSoup_st:
         cal = calendar(events=calendar_events, options=calendar_options, custom_css=custom_css)
         st.write(cal)
     
+    def ChatFeatures(self):
+
+
+        st.session_state.open_ai_key = st.secrets['OPENAI_KEY']
+        def get_pdf_text(pdf_docs):
+            text = ""
+            for pdf in pdf_docs:
+                pdf_reader = PdfReader(pdf)
+                for page in pdf_reader.pages:
+                    text += page.extract_text()
+            return text
+
+        def get_text_chunks(text):
+            text_splitter = CharacterTextSplitter(
+                separator="\n",
+                chunk_size=1000,
+                chunk_overlap=200,
+                length_function=len
+            )
+            chunks = text_splitter.split_text(text)
+            return chunks
+
+        def get_vectorstore(text_chunks):
+            embeddings = OpenAIEmbeddings(openai_api_key=st.session_state.open_ai_key)
+            # embeddings = HuggingFaceInstructEmbeddings(model_name="hkunlp/instructor-xl")
+            vectorstore = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
+            return vectorstore
+
+        def get_conversation_chain(vectorstore):
+            llm = ChatOpenAI(openai_api_key=st.session_state.open_ai_key)
+            # llm = HuggingFaceHub(repo_id="google/flan-t5-xxl", model_kwargs={"temperature":0.5, "max_length":512})
+
+            memory = ConversationBufferMemory(
+                memory_key='chat_history', return_messages=True)
+            conversation_chain = ConversationalRetrievalChain.from_llm(
+                llm=llm,
+                retriever=vectorstore.as_retriever(),
+                memory=memory
+            )
+            return conversation_chain
+
+        def handle_userinput(user_question):
+            response = st.session_state.conversation({'question': user_question})
+            st.session_state.chat_history = response['chat_history']
+
+            with st.sidebar.expander("Chat History", expanded=True):
+                for i, message in enumerate(st.session_state.chat_history):
+                    if i % 2 == 0:
+                        st.write(user_template.replace(
+                            "{{MSG}}", message.content), unsafe_allow_html=True)
+                    else:
+                        st.write(bot_template.replace(
+                            "{{MSG}}", message.content), unsafe_allow_html=True)
+
+        def main():
+            user_question = st.chat_input("Ask a question about your documents:")
+            if user_question:
+                handle_userinput(user_question)
+
+            with st.sidebar:
+                # from other sources
+                selection = st.radio("Select your source", ["Docs", "PDFs"], horizontal=True)
+                if st.button("Process", key="process"):#, value=True):
+                    if selection == "PDFs":
+                        pdf_docs = st.file_uploader(
+                            "Upload your PDFs here and click on 'Process'", accept_multiple_files=True)
+                        raw_text = get_pdf_text(pdf_docs)
+                    elif selection == "Docs":
+                        raw_text = self.get_text()
+                    text_chunks = get_text_chunks(raw_text)
+                    vectorstore = get_vectorstore(text_chunks)
+
+                    st.session_state.conversation = get_conversation_chain(
+                        vectorstore)
+
+        main()
+        # done
+
+    def get_text(self):
+        return self.text
+    
     def run(self):  
         self.configurations()
         self.get_files_from_archive()
@@ -274,7 +386,7 @@ class DuckSoup_st:
         commands = ['AI', 'Vault', 'Theme', 'About', 'Calendar']
         self.selected_file =  selected if selected in self.files else self.files[0] if selected not in commands else selected
         st.write(self.selected_file)
-
+        
         if selected in commands and selected != 'Calendar':
             self.Onsettings()
         elif selected == 'Calendar':
@@ -291,6 +403,8 @@ class DuckSoup_st:
             if st.sidebar.button('Delete', key='delete', use_container_width=True):
                 self.OnDelete()
                 st.experimental_rerun()
+            self.ChatFeatures()
+
 
 if __name__ == '''__main__''':
     app = DuckSoup_st()
