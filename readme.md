@@ -1,5 +1,5 @@
-
 ## Setup
+### On Mac:
 ```
 virtualenv env_main -p python3
 source env_main/bin/activate
@@ -7,13 +7,23 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
+### On Windows:
+```
+virtualenv env_main -p python3
+env_main\Scripts\activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
 ### To run the app:
-1. Create a folder to store the notes.
 ```
 python main.py 
 ```
-2. Assign the folder to the app as Vault.
 
+1. Open the settings and link a folder to the app as Vault.
+2. Press CMD + N to create a new file.
+3. Write what you want.
+4. Press CMD + S to save the file.
 
 ---
 ## Dependencies
