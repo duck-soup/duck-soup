@@ -13,6 +13,8 @@ import streamlit_antd_components as sac
 from streamlit_ace import st_ace
 from streamlit_ace import KEYBINDINGS
 from utils import get_random_title
+import streamlit.components.v1 as components
+from streamlit_calendar import calendar
 
 st.set_page_config(layout="wide")
 
@@ -113,7 +115,16 @@ class DuckSoup_st:
     def create_file_menu(self):
         with st.sidebar:
             menu = sac.menu([
-                sac.MenuItem('files', icon='lock', children=[sac.MenuItem(f'{file}', icon='card-text', tag=f'Tag{i}') for i,file in enumerate(self.files)]),
+                sac.MenuItem('Docs', icon='lock', children=[sac.MenuItem(f'{file}', icon='card-text', tag=f'Tag{i}') for i,file in enumerate(self.files)]),
+                sac.MenuItem('Settings', icon='gear', children=[
+                    sac.MenuItem('AI', icon='robot'),
+                    sac.MenuItem('Vault', icon='lock'),
+                    sac.MenuItem('Theme', icon='brush'),
+                    sac.MenuItem('About', icon='info-circle'),
+                ]),
+                # add calendar
+                sac.MenuItem('Calendar', icon='calendar'),
+                    
             ], open_all=True)
         return menu
 
@@ -158,23 +169,128 @@ class DuckSoup_st:
         except:
             st.error('No file selected')
 
+    def Onsettings(self):
+        if self.selected_file == 'AI':
+            with st.form(key='settings'):
+                c1,c2 = st.columns([1,1])
+                with c1:
+                    self.summarizer_model = st.selectbox('Summarizer', ['OpenAI', 'BART', 'T5', 'Pegasus'])
+                    self.qa_model = st.selectbox('QA', ['OpenAI', 'BART', 'T5', 'Pegasus'])
+                    self.text_generation_model = st.selectbox('Text Generation', ['OpenAI', 'BART', 'T5', 'Pegasus'])
+                with c2:
+                    self.openai_key = st.text_input('OpenAI Key')
+                save_b = st.form_submit_button('Save')
+                if save_b:
+                    self.configurations()
+                    with open('config.yaml', 'w') as f:
+                        yaml.dump({
+                            'home_dir': self.home_dir,
+                            'summarizer_model': self.summarizer_model,
+                            'qa_model': self.qa_model,
+                            'text_generation_model': self.text_generation_model,
+                            'openai_key': self.openai_key
+                        }, f)
+                    st.experimental_rerun()
+        
+        elif self.selected_file == 'Vault':
+            with st.form(key='settings'):
+                self.home_dir = st.text_input('Home Directory', placeholder=self.home_dir)
+                save_b = st.form_submit_button('Save')
+                if save_b:
+                    self.configurations()
+                    with open('config.yaml', 'w') as f:
+                        yaml.dump({
+                            'home_dir': self.home_dir,
+                            'summarizer_model': self.summarizer_model,
+                            'qa_model': self.qa_model,
+                            'text_generation_model': self.text_generation_model,
+                            'openai_key': self.openai_key
+                        }, f)
+                    st.experimental_rerun()
+
+    def OnCalendar(self):
+        calendar_options = {
+            "headerToolbar": {
+                "left": "today prev,next",
+                "center": "title",
+                "right": "resourceTimelineDay,resourceTimelineWeek,resourceTimelineMonth",
+            },
+            "slotMinTime": "06:00:00",
+            "slotMaxTime": "18:00:00",
+            "initialView": "resourceTimelineDay",
+            "resourceGroupField": "building",
+            "resources": [
+                {"id": "a", "building": "Building A", "title": "Building A"},
+                {"id": "b", "building": "Building A", "title": "Building B"},
+                {"id": "c", "building": "Building B", "title": "Building C"},
+                {"id": "d", "building": "Building B", "title": "Building D"},
+                {"id": "e", "building": "Building C", "title": "Building E"},
+                {"id": "f", "building": "Building C", "title": "Building F"},
+            ],
+        }
+        calendar_events = [
+            {
+                "title": "Event 1",
+                "start": "2023-10-24T08:30:00",
+                "end": "2023-10-25T10:30:00",
+                "resourceId": "a",
+            },
+            {
+                "title": "Event 2",
+                "start": "2023-07-31T07:30:00",
+                "end": "2023-07-31T10:30:00",
+                "resourceId": "b",
+            },
+            {
+                "title": "Event 3",
+                "start": "2023-07-31T10:40:00",
+                "end": "2023-07-31T12:30:00",
+                "resourceId": "a",
+            }
+        ]
+        custom_css="""
+            .fc-event-past {
+                opacity: 0.8;
+            }
+            .fc-event-time {
+                font-style: italic;
+            }
+            .fc-event-title {
+                font-weight: 700;
+            }
+            .fc-toolbar-title {
+                font-size: 2rem;
+            }
+        """
+
+        cal = calendar(events=calendar_events, options=calendar_options, custom_css=custom_css)
+        st.write(cal)
+    
     def run(self):  
         self.configurations()
         self.get_files_from_archive()
         st.write(self.home_dir)
         selected = self.create_file_menu()
-        self.selected_file =  selected if selected in self.files else self.files[0]
-        self.text_editor()
-        c1,c2 = st.sidebar.columns([1,1])
-        if c1.button('New', key='new', use_container_width=True):
-            self.OnNew()
-            st.experimental_rerun()
-        if c2.button('Save', key='save', use_container_width=True):
-            self.OnSave()
+        commands = ['AI', 'Vault', 'Theme', 'About', 'Calendar']
+        self.selected_file =  selected if selected in self.files else self.files[0] if selected not in commands else selected
+        st.write(self.selected_file)
 
-        if st.sidebar.button('Delete', key='delete', use_container_width=True):
-            self.OnDelete()
-            st.experimental_rerun()
+        if selected in commands and selected != 'Calendar':
+            self.Onsettings()
+        elif selected == 'Calendar':
+            self.OnCalendar()
+
+        if selected in self.files:
+            self.text_editor()
+            c1,c2 = st.sidebar.columns([1,1])
+            if c1.button('New', key='new', use_container_width=True):
+                self.OnNew()
+                st.experimental_rerun()
+            if c2.button('Save', key='save', use_container_width=True):
+                self.OnSave()
+            if st.sidebar.button('Delete', key='delete', use_container_width=True):
+                self.OnDelete()
+                st.experimental_rerun()
 
 if __name__ == '''__main__''':
     app = DuckSoup_st()

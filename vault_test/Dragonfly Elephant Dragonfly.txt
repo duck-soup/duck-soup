@@ -1,2 +1,46 @@
 🥐
 # Dragonfly Elephant Dragonfly
+
+So here we can use all this:
+
+
+Element	Markdown Syntax
+Heading	# H1
+
+## H2
+
+### H3
+
+Bold	**bold text**
+
+Italic	*italicized text*
+
+Blockquote	> blockquote
+
+Ordered List	
+1. First item
+2. Second item
+3. Third item
+
+Unordered List	
+- First item
+- Second item
+- Third item
+
+Code	
+```python
+def now():
+    return action
+```
+
+Horizontal Rule	
+
+---
+
+Link	
+
+[Markdown Guide](https://www.markdownguide.org/cheat-sheet/)
+
+Image	
+
+![Elon](https://i.guim.co.uk/img/media/b76c73d562c80c8e541b9dfcfc0db673e1e14582/659_500_3957_2374/master/3957.jpg?width=1200&quality=85&auto=format&fit=max&s=a2995616b00c75ccf1ccf296144f06a4)
