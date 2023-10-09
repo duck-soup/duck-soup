@@ -15,7 +15,12 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### To run the app:
+### To run the app as a streamlit web app:
+``
+streamlit run main_st.py
+```
+
+### To run the app as a exe wit wxpython:
 ```
 python main.py 
 ```

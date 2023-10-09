@@ -1,9 +1,9 @@
-home_dir: /Users/robertoscalas/Desktop/vault
+home_dir: vault_test
 list_file_background_color: white
 list_file_foreground_color: black
 list_words_background_color: white
 list_words_foreground_color: black
-openai_key: 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
+openai_key: 
 panel_background_color: white
 qa_model: OpenAI
 summarizer_model: OpenAI

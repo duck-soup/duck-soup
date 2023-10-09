@@ -13,3 +13,4 @@ markdown2
 tdqm
 markdown-checklist
 openai
+streamlit
