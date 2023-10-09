@@ -1,7 +1,6 @@
-import os
 import openai
 
-class NLP:
+class NLP_opeanai:
     def __init__(self, name, openaikey):
         self.name = name
         self._log_in(openaikey)
@@ -65,7 +64,6 @@ class NLP:
       except:
         ValueError("Invalid response")
 
- 
     def answer_question(self, prompt = 'Hello', temperature = 0.9, max_tokens = 300, top_p = 1, frequency_penalty = 0.0, presence_penalty = 0.6, stop = [" Human:", " AI:"]):
       try:
         response = openai.Completion.create(
@@ -82,10 +80,11 @@ class NLP:
         return response['choices'][0]['text']
       except:
         ValueError("Invalid response")
+
    
 if __name__ == "__main__":
     # test all methods
-    nlp = NLP('duck-soup', '__INSERT_YOUR_OPENAI_API_KEY_HERE__')
+    nlp = NLP_opeanai('duck-soup', '__INSERT_YOUR_OPENAI_API_KEY_HERE__')
     prompt = "The quick brown fox jumps over the lazy red dog. The dog is red."
     summary = nlp.summarize(prompt)
     generated = nlp.generate_text(prompt)

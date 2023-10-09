@@ -1,3 +1,4 @@
+
 ## Setup
 ```
 virtualenv env_main -p python3
@@ -11,6 +12,15 @@ To build the app with pyinstaller:
 ```
 pyinstaller --name=neto --windowed --onefile --icon=icon.ico Note_App.py
 ```
+
+
+### To run the app:
+1. Create a folder to store the notes.
+```
+python main.py 
+```
+2. Assign the folder to the app as Vault.
+
 
 ---
 ## Dependencies

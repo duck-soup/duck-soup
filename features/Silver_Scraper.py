@@ -84,7 +84,7 @@ class Silver_Scraper:
         return: wiki_text (string)
         -------------------------
         This last word should be in the form of:
-        ```/wiki-<search_word>+<chapter_to_get>```
+        `/wiki-<search_word>+<chapter_to_get>`
 
         1. get the word to search
 

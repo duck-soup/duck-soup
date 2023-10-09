@@ -1,6 +1,6 @@
 
-from features.NLP_Processor import NLP
-from features.Silver_Scraper import Silver_Scraper
+from ai import NLP_opeanai as NLP
+from silver_scraper import Silver_Scraper
 
 import tkinter as tk
 import nltk
@@ -36,8 +36,9 @@ class TextEditor:
                     relief="groove",
                     wrap="word",
         )
+        
         # initialize the NLP processor
-        self.NLP_Processor = NLP()
+        self.NLP_Processor = NLP(name="2", openaikey='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')
         self.binds()
 
 # ----------------------------- HELPERS -------------------------
