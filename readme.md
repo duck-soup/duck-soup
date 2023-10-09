@@ -7,13 +7,6 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-
-To build the app with pyinstaller:
-```
-pyinstaller --name=neto --windowed --onefile --icon=icon.ico Note_App.py
-```
-
-
 ### To run the app:
 1. Create a folder to store the notes.
 ```
