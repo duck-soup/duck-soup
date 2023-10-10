@@ -185,7 +185,7 @@ class DuckSoup_st:
                     ]),
                     # add calendar
                         
-                ], open_all=False, open_index=0)
+                ], open_all=False)
             return menu
 
     def open_selected_file(self, with_db = False):
