@@ -124,6 +124,12 @@ class DbSettings:
     def get_all(self):
         self.cursor.execute('''SELECT * FROM settings''')
         return self.cursor.fetchall()
+    
+    def update_key(self, key):
+        self.cursor.execute('''UPDATE settings SET
+            openai_api_key = ?
+        ''', (key,))
+        self.conn.commit()
 
 
 # create db for ai assistants
@@ -169,7 +175,7 @@ class DbAIAssistants:
             WHERE id = ?
         ''', (name, temperature, role, image_path, id))
         self.conn.commit()
-        
+
     def update_from_name(self, name, temperature, role, image_path):
         self.cursor.execute('''UPDATE ai_assistants SET
             temperature = ?,

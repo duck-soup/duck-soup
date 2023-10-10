@@ -24,8 +24,12 @@ from langchain.chat_models import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 from utils import css, bot_template, user_template, bot_template_creation
-from langchain.llms import HuggingFaceHub
-from langchain.prompts import ChatPromptTemplate
+from langchain.chains import LLMChain
+from langchain.llms import OpenAI
+from langchain.memory import ConversationBufferMemory
+from langchain.memory.chat_message_histories import StreamlitChatMessageHistory
+from langchain.prompts import PromptTemplate
+import streamlit as st
 from langchain.chat_models import ChatOpenAI
 from database import DatabaseManager, DbSettings, DbAIAssistants
 
@@ -38,6 +42,8 @@ class DuckSoup_st:
         self.db = DatabaseManager('notes.db')
         self.settings_db = DbSettings('settings.db')
         self.ai_assistants_db = DbAIAssistants('ai_assistants.db')
+        # initialise the model
+
 
         if "conversation" not in st.session_state:
             st.session_state.conversation = None
@@ -426,6 +432,9 @@ class DuckSoup_st:
     def OnAIAssistant(self):
         # need to create a new page when we can set the role of the ai assistant and the parameters of the model
         with_ai_assistant = st.toggle('AI Assistant', value=st.session_state.with_assistant_ai)
+        if self.openai_key == '' or self.openai_key == None:
+            st.info('Please go in ⚙️ Settings and update your OpenAI API Key')
+            st.stop()
         st.session_state.with_assistant_ai = with_ai_assistant
         if st.session_state.with_assistant_ai and self.ai_assistants_db.get_all() == []:
             with st.form(key= 'AI_Assistant'):
@@ -471,13 +480,14 @@ class DuckSoup_st:
             self.OnNewAI()
         else:
             buttons =  [sac.ButtonsItem(label='New AI')] + [sac.ButtonsItem(label=f'{ai[1]}') for ai in self.ai_assistants_db.get_all()]
-            choosen = sac.buttons(buttons, format_func='title', align='center', shape='round', index = None)
+            choosen = sac.buttons(buttons, format_func='title', align='center', shape='round', index = 1)
             if choosen == 'New AI':
                 self.OnNewAI()
                 st.stop()
             else:
                 # get ai from name 
                 ai = self.ai_assistants_db.get_by_name(choosen)
+                st.session_state.choosen_ai = choosen
                 if ai:
                     with st.form(key = f'{ai[1]}'):
                         name = ai[1]
@@ -515,9 +525,63 @@ class DuckSoup_st:
                             st.experimental_rerun()
 
                         return name, temperature, role, image
+    
+    def ChatAgent(self):
+        # get current ai agent
+        ai = self.ai_assistants_db.get_by_name(st.session_state.choosen_ai)
+        name = ai[1]
+        temperature = ai[2]
+        role = ai[3]
+        image = ai[4]
+        # Set up memory
+        msgs = StreamlitChatMessageHistory(key="langchain_messages")
+        memory = ConversationBufferMemory(chat_memory=msgs)
+        if len(msgs.messages) == 0:
+            msgs.add_ai_message("How can I help you?")
+
+        view_messages = st.expander("View the message contents in session state")
+
+        # Get an OpenAI API Key before continuing
+        if self.openai_key:
+            openai_api_key = self.openai_key
+        else:
+            openai_api_key = st.sidebar.text_input("OpenAI API Key", type="password")
+        if not openai_api_key:
+            st.info("Enter an OpenAI API Key to continue")
+            st.stop()
+
+        # Set up the LLMChain, passing in memory
+        template = """You are an AI chatbot having a conversation with a human.
+
+        {history}
+        Human: {human_input}
+        AI: """
+        prompt = PromptTemplate(input_variables=["history", "human_input"], template=template)
+        llm_chain = LLMChain(llm=OpenAI(openai_api_key=openai_api_key), prompt=prompt, memory=memory)
+
+        # Render current messages from StreamlitChatMessageHistory
+        def render_messages():
+            with st.sidebar.expander("Chat History", expanded=True):
+                if st.button('Restart Memory', use_container_width=True):
+                    st.session_state.langchain_messages = []
+                    st.experimental_rerun()
+
+                for i, msg in enumerate(msgs.messages):
+                    if i % 2 != 0:
+                        st.write(user_template.replace("{{MSG}}", msg.content), unsafe_allow_html=True)
+                    else:
+                        st.write(bot_template_creation.replace("{{MSG}}", msg.content).replace('{{IMAGE}}', image), unsafe_allow_html=True)
+
+        # If user inputs a new prompt, generate and draw a new response
+        if prompt := st.chat_input():
+            response = llm_chain.run(prompt)
+        
+
+
+    
+        render_messages()
 
     def ChatFeatures(self):
-
         # get open_ai_key from the config file
         st.session_state.open_ai_key = self.openai_key
         try:
@@ -525,81 +589,29 @@ class DuckSoup_st:
         except:
             open_ai_key = st.text_input(
             "Please enter your OpenAI API key", type="password")
-            if st.button("Save key"):
+            save_button = st.button("Save key")
+            if save_button and not self.with_db:
                 # save to config file
                 with open('config.yaml', 'r') as f:
                     config = yaml.safe_load(f)
                 config['openai_key'] = open_ai_key
                 with open('config.yaml', 'w') as f:
                     yaml.dump(config, f)
-
+            elif save_button and self.with_db:
+                # save to db
+                self.settings_db.update_key(open_ai_key)
             # save as session state
             st.session_state.open_ai_key = open_ai_key
 
-        def get_text_chunks(text):
-            text_splitter = CharacterTextSplitter(
-                separator="\n",
-                chunk_size=1000,
-                chunk_overlap=200,
-                length_function=len
-            )
-            chunks = text_splitter.split_text(text)
-            return chunks
-
-        def get_vectorstore(text_chunks):
-            embeddings = OpenAIEmbeddings(openai_api_key=st.session_state.open_ai_key)
-            # embeddings = HuggingFaceInstructEmbeddings(model_name="hkunlp/instructor-xl")
-            vectorstore = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
-            return vectorstore
-
-        def get_conversation_chain(vectorstore):
-            llm = ChatOpenAI(openai_api_key=st.session_state.open_ai_key)
-            # llm = HuggingFaceHub(repo_id="google/flan-t5-xxl", model_kwargs={"temperature":0.5, "max_length":512})
-
-            memory = ConversationBufferMemory(
-                memory_key='chat_history', return_messages=True)
-            conversation_chain = ConversationalRetrievalChain.from_llm(
-                llm=llm,
-                retriever=vectorstore.as_retriever(),
-                memory=memory
-            )
-            return conversation_chain
-
-        def handle_userinput(user_question):
-            response = st.session_state.conversation({'question': user_question})
-            st.session_state.chat_history = response['chat_history']
-
-            with st.sidebar.expander("Chat History", expanded=True):
-                for i, message in enumerate(st.session_state.chat_history):
-                    if i % 2 == 0:
-                        st.write(user_template.replace(
-                            "{{MSG}}", message.content), unsafe_allow_html=True)
-                    else:
-                        st.write(bot_template.replace(
-                            "{{MSG}}", message.content), unsafe_allow_html=True)
-
-        user_question = st.chat_input("Ask a question about your documents:")
-        if user_question:
-            handle_userinput(user_question)
-
         if st.session_state.with_assistant_ai:
-            with st.sidebar:
-                # from other sources
-                if st.button('Chat with AI', use_container_width=True):
-                    raw_text = self.get_text()
-                    text_chunks = get_text_chunks(raw_text)
-                    vectorstore = get_vectorstore(text_chunks)
-
-                    st.session_state.conversation = get_conversation_chain(
-                        vectorstore)
-                # new chat button
-                if st.button('Reset', use_container_width=True):
-                    st.session_state.conversation = None
-                    st.session_state.chat_history = None
-            # done
+            # get name of selected ai
+            self.ChatAgent()
 
     def get_text(self):
-        return self.text
+        try:
+            return self.text
+        except:
+            return ''
     
     def run(self):  
         with st.sidebar:
