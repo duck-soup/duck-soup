@@ -51,6 +51,8 @@ class DuckSoup_st:
             st.session_state.chat_history = None
         if "with_assistant_ai" not in st.session_state:
             st.session_state.with_assistant_ai = False
+        if "choosen_ai" not in st.session_state:
+            st.session_state.choosen_ai = None
 
     def init_css(self):
         css = '''               
@@ -618,7 +620,7 @@ class DuckSoup_st:
         with st.sidebar:
             db_or_file =  sac.buttons([
                 sac.ButtonsItem(label='Database', icon='database'),
-                sac.ButtonsItem(label='Folder', icon='folder'),
+                sac.ButtonsItem(label='Folder', icon='folder', disabled=True)
             ])
         self.with_db = True if db_or_file == 'Database' else False
         if self.with_db:
