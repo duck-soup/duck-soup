@@ -441,7 +441,7 @@ class DuckSoup_st:
                 time = c4.time_input('Time', value='now')
                 tab1, tab2 = st.tabs(['Text Editor', 'Markdown Preview'])
                 with tab1:
-                    content = st_ace(placeholder=title, value = content, height=500)
+                    content = st_ace(placeholder=title, value = content, height=500, auto_update=True, language='markdown', wrap = True)
                 with tab2:
                     css_for_markdown = '''
                         <div class="markdown-text-container">
