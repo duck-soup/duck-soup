@@ -23,10 +23,11 @@ from langchain.vectorstores import FAISS
 from langchain.chat_models import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
-from utils import css, bot_template, user_template
+from utils import css, bot_template, user_template, bot_template_creation
 from langchain.llms import HuggingFaceHub
-
-from database import DatabaseManager
+from langchain.prompts import ChatPromptTemplate
+from langchain.chat_models import ChatOpenAI
+from database import DatabaseManager, DbSettings, DbAIAssistants
 
 st.set_page_config(layout="wide")
 
@@ -35,11 +36,15 @@ class DuckSoup_st:
         load_dotenv()
         st.write(css, unsafe_allow_html=True)
         self.db = DatabaseManager('notes.db')
+        self.settings_db = DbSettings('settings.db')
+        self.ai_assistants_db = DbAIAssistants('ai_assistants.db')
 
         if "conversation" not in st.session_state:
             st.session_state.conversation = None
         if "chat_history" not in st.session_state:
             st.session_state.chat_history = None
+        if "with_assistant_ai" not in st.session_state:
+            st.session_state.with_assistant_ai = False
 
     def init_css(self):
         css = '''               
@@ -125,6 +130,19 @@ class DuckSoup_st:
         else:
             #self.nlp = NLP()
             pass
+    
+    def configurations_from_db(self):
+        # get the settings from the database
+        settings = self.settings_db.get_all()
+        if settings == []:
+            # set the default settings
+            settings = ['OpenAI', 'OpenAI', 'OpenAI', '']
+            self.settings_db.insert(*settings)
+        settings = settings[0]
+        self.summarizer_model = settings[0]
+        self.qa_model = settings[1]
+        self.text_generation_model = settings[2]
+        self.openai_key = settings[3]
 
     def get_files_from_archive(self):
         '''
@@ -158,6 +176,7 @@ class DuckSoup_st:
                 menu = sac.menu([
                     sac.MenuItem('Docs', icon=icon_docs, children = children),
                     sac.MenuItem('Calendar', icon='calendar'),
+                    sac.MenuItem('AI Assistant', icon='robot'),
                     sac.MenuItem('Settings', icon='gear', children=[
                         sac.MenuItem('AI', icon='robot'),
                         sac.MenuItem('Vault', icon='lock'),
@@ -193,11 +212,6 @@ class DuckSoup_st:
             if c3.form_submit_button('Delete', use_container_width=True):
                 self.OnDelete(with_db)
                 st.experimental_rerun()
-
-            title = self.selected_file.replace('.txt','') if not with_db else self.selected_file    
-            
-            col1, col2 = st.columns([1,1])
-            title = col1.text_input('Title', value=title)
 
             tab1,tab2 = st.tabs([f'Text Editor', f'Markdown Preview'])
 
@@ -261,9 +275,10 @@ class DuckSoup_st:
                     self.qa_model = st.selectbox('QA', ['OpenAI', 'BART', 'T5', 'Pegasus'])
                     self.text_generation_model = st.selectbox('Text Generation', ['OpenAI', 'BART', 'T5', 'Pegasus'])
                 with c2:
-                    self.openai_key = st.text_input('OpenAI Key')
+                    self.openai_key = st.text_input('OpenAI Key', value=self.openai_key, type='password')
+
                 save_b = st.form_submit_button('Save')
-                if save_b:
+                if save_b and not self.with_db:
                     self.configurations()
                     with open('config.yaml', 'w') as f:
                         yaml.dump({
@@ -273,9 +288,12 @@ class DuckSoup_st:
                             'text_generation_model': self.text_generation_model,
                             'openai_key': self.openai_key
                         }, f)
+
+                elif save_b and self.with_db:
+                    self.settings_db.update(self.summarizer_model, self.qa_model, self.text_generation_model, self.openai_key)
                     st.experimental_rerun()
         
-        elif self.selected_file == 'Vault':
+        elif self.selected_file == 'Vault' and not self.with_db:
             with st.form(key='settings'):
                 self.home_dir = st.text_input('Home Directory', placeholder=self.home_dir)
                 save_b = st.form_submit_button('Save')
@@ -290,6 +308,11 @@ class DuckSoup_st:
                             'openai_key': self.openai_key
                         }, f)
                     st.experimental_rerun()
+        
+        elif self.selected_file == 'Vault' and self.with_db:
+            st.success('No settings for Vault - Currently in DB mode')
+        elif self.selected_file == 'Theme':
+            color_choose = st.color_picker('Pick A Color', '#00f900')
 
     def OnCalendar(self):
         calendar_options = {
@@ -400,9 +423,103 @@ class DuckSoup_st:
                         f.write(content)
                     st.experimental_rerun()
 
+    def OnAIAssistant(self):
+        # need to create a new page when we can set the role of the ai assistant and the parameters of the model
+        with_ai_assistant = st.toggle('AI Assistant', value=st.session_state.with_assistant_ai)
+        st.session_state.with_assistant_ai = with_ai_assistant
+        if st.session_state.with_assistant_ai and self.ai_assistants_db.get_all() == []:
+            with st.form(key= 'AI_Assistant'):
+                # add parameters for the AI assistant
+                save_button = st.form_submit_button('Save Now') 
+                name, temperature, role, image = self.CreateAI()
+                if save_button:
+                    # save the parameters in the database
+                    self.ai_assistants_db.insert(name, temperature, role, image)
+                    st.experimental_rerun()
+        elif st.session_state.with_assistant_ai and self.ai_assistants_db.get_all() != []:
+            self.CreateAI()
+
+    def OnNewAI(self):
+        with st.form('AI_Assistant_new'):
+            name = st.text_input('Name', value='Elon')
+            c1,c2 = st.columns([1,1])
+            image = c2.text_input('Image', value = 'data:image/jpeg;base64,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')
+            temperature = st.slider('Temperature', 0.0, 1.0, 0.5)
+            c1.write(bot_template_creation.replace("{{MSG}}", name).replace('{{IMAGE}}', image), unsafe_allow_html=True)
+            c1.markdown
+            model = ChatOpenAI(openai_api_key=st.session_state.open_ai_key)
+            from langchain.schema import (
+                AIMessage,
+                HumanMessage,
+                SystemMessage
+            )
+            role = st.text_area('Role', value = 'You are a stand-up comedian that always try to make a joke about what the user says.')
+            chat_due = st.text_input(label='Chat', key = 'chat_2')
+            if chat_due:
+                message = role + '\n' + chat_due
+                answer = model([HumanMessage(content=message)])
+                st.write(answer)
+
+            if st.form_submit_button('Save', use_container_width=True, type='primary'):
+                self.ai_assistants_db.insert(name, temperature, role, image)
+                st.success('Saved')
+                st.experimental_rerun()
+            return name, temperature, role, image
+        
+    def CreateAI(self):
+        if self.ai_assistants_db.get_all() == []:
+            self.OnNewAI()
+        else:
+            buttons =  [sac.ButtonsItem(label='New AI')] + [sac.ButtonsItem(label=f'{ai[1]}') for ai in self.ai_assistants_db.get_all()]
+            choosen = sac.buttons(buttons, format_func='title', align='center', shape='round', index = None)
+            if choosen == 'New AI':
+                self.OnNewAI()
+                st.stop()
+            else:
+                # get ai from name 
+                ai = self.ai_assistants_db.get_by_name(choosen)
+                if ai:
+                    with st.form(key = f'{ai[1]}'):
+                        name = ai[1]
+                        temperature = ai[2]
+                        role = ai[3]
+                        image = ai[4]
+
+                        c1,c2 = st.columns([1,1])
+                        name = c1.text_input('Name', value=name)
+                        image = c2.text_input('Image', value = image)
+                        st.write(bot_template_creation.replace("{{MSG}}", name).replace('{{IMAGE}}', image), unsafe_allow_html=True)
+                        role = st.text_area('Role', value = role)
+                        temperature = st.slider('Temperature', 0.0, 1.0, temperature)
+                        model = ChatOpenAI(openai_api_key=st.session_state.open_ai_key)
+                        from langchain.schema import (
+                            AIMessage,
+                            HumanMessage,
+                            SystemMessage
+                        )
+                        chat_due = st.text_input(label='Chat', key = 'chat_2', placeholder='Hi, can you help me?')
+                        if chat_due:
+                            message = role + '\n' + chat_due
+                            answer = model([HumanMessage(content=message)])
+                            st.write(bot_template_creation.replace("{{MSG}}", answer.content).replace('{{IMAGE}}', image), unsafe_allow_html=True)
+
+                        if st.form_submit_button('Save', use_container_width=True, type='primary'):
+                            # get id from name
+                            self.ai_assistants_db.update_from_name(name, temperature, role, image)
+                            st.success('Saved')
+                            st.experimental_rerun()
+
+                        if st.form_submit_button('Delete', use_container_width=True, type='secondary'):
+                            self.ai_assistants_db.delete_from_name(name)
+                            st.success('Deleted')
+                            st.experimental_rerun()
+
+                        return name, temperature, role, image
+
     def ChatFeatures(self):
 
         # get open_ai_key from the config file
+        st.session_state.open_ai_key = self.openai_key
         try:
             open_ai_key = st.session_state.open_ai_key
         except:
@@ -418,16 +535,6 @@ class DuckSoup_st:
 
             # save as session state
             st.session_state.open_ai_key = open_ai_key
-
-
-
-        def get_pdf_text(pdf_docs):
-            text = ""
-            for pdf in pdf_docs:
-                pdf_reader = PdfReader(pdf)
-                for page in pdf_reader.pages:
-                    text += page.extract_text()
-            return text
 
         def get_text_chunks(text):
             text_splitter = CharacterTextSplitter(
@@ -471,41 +578,40 @@ class DuckSoup_st:
                         st.write(bot_template.replace(
                             "{{MSG}}", message.content), unsafe_allow_html=True)
 
-        def main():
-            user_question = st.chat_input("Ask a question about your documents:")
-            if user_question:
-                handle_userinput(user_question)
+        user_question = st.chat_input("Ask a question about your documents:")
+        if user_question:
+            handle_userinput(user_question)
 
+        if st.session_state.with_assistant_ai:
             with st.sidebar:
                 # from other sources
-                selection = st.radio("Select your source", ["Docs", "PDFs"], horizontal=True)
-                if st.button("Process", key="process"):#, value=True):
-                    if selection == "PDFs":
-                        pdf_docs = st.file_uploader(
-                            "Upload your PDFs here and click on 'Process'", accept_multiple_files=True)
-                        raw_text = get_pdf_text(pdf_docs)
-                    elif selection == "Docs":
-                        raw_text = self.get_text()
+                if st.button('Chat with AI', use_container_width=True):
+                    raw_text = self.get_text()
                     text_chunks = get_text_chunks(raw_text)
                     vectorstore = get_vectorstore(text_chunks)
 
                     st.session_state.conversation = get_conversation_chain(
                         vectorstore)
-
-        main()
-        # done
+                # new chat button
+                if st.button('Reset', use_container_width=True):
+                    st.session_state.conversation = None
+                    st.session_state.chat_history = None
+            # done
 
     def get_text(self):
         return self.text
     
     def run(self):  
-        self.configurations()
         with st.sidebar:
             db_or_file =  sac.buttons([
                 sac.ButtonsItem(label='Database', icon='database'),
                 sac.ButtonsItem(label='Folder', icon='folder'),
             ])
         self.with_db = True if db_or_file == 'Database' else False
+        if self.with_db:
+            self.configurations_from_db()
+        else:
+            self.configurations()
         with_db = self.with_db
         if db_or_file == 'Database':
             self.get_files_from_database()
@@ -516,7 +622,6 @@ class DuckSoup_st:
         commands = ['AI', 'Vault', 'Theme', 'About', 'Calendar', 'Upload']
         try:
             self.selected_file =  selected if selected in self.files else self.files[0] if selected not in commands else selected
-            st.write(self.selected_file)
         except:
             self.selected_file = self.files[0] if self.files != [] else 'No files'
         
@@ -526,6 +631,8 @@ class DuckSoup_st:
             self.OnCalendar()
         elif selected == 'Upload':
             self.OnUpload()
+        elif selected == 'AI Assistant':
+            self.OnAIAssistant()
 
         if selected in self.files:
             self.text_editor(with_db)

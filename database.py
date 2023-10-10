@@ -81,4 +81,121 @@ class DatabaseManager:
     def get_by_date(self, date):
         self.cursor.execute('''SELECT * FROM notes WHERE date = ?''', (date,))
         return self.cursor.fetchone()
+
+
+'''
+Schema for Settings
+    summariser: string
+    qa: string
+    text_gen: string
+    openai_api_key: string
+'''
+class DbSettings:
+    def __init__(self, db_name):
+        self.db_name = db_name
+        self.conn = sqlite3.connect(self.db_name)
+        self.cursor = self.conn.cursor()
+        self.create_table()
+
+    def create_table(self):
+        self.cursor.execute('''CREATE TABLE IF NOT EXISTS settings (
+            summariser TEXT,
+            qa TEXT,
+            text_gen TEXT,
+            openai_api_key TEXT
+        )''')
+        self.conn.commit()
+
+    def insert(self, summariser, qa, text_gen, openai_api_key):
+        self.cursor.execute('''INSERT INTO settings VALUES (
+            ?, ?, ?, ?
+        )''', (summariser, qa, text_gen, openai_api_key))
+        self.conn.commit()
+
+    def update(self, summariser, qa, text_gen, openai_api_key):
+        self.cursor.execute('''UPDATE settings SET
+            summariser = ?,
+            qa = ?,
+            text_gen = ?,
+            openai_api_key = ?
+        ''', (summariser, qa, text_gen, openai_api_key))
+        self.conn.commit()
+
+    def get_all(self):
+        self.cursor.execute('''SELECT * FROM settings''')
+        return self.cursor.fetchall()
+
+
+# create db for ai assistants
+'''
+Schema AI assistants
+id: int
+name: string
+temperature: float
+role: string
+image_path: string
+'''
+
+class DbAIAssistants:
+    def __init__(self, db_name):
+        self.db_name = db_name
+        self.conn = sqlite3.connect(self.db_name)
+        self.cursor = self.conn.cursor()
+        self.create_table() 
+
+
+    def create_table(self):
+        self.cursor.execute('''CREATE TABLE IF NOT EXISTS ai_assistants (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            temperature REAL,
+            role TEXT,
+            image_path TEXT
+        )''')
+        self.conn.commit()
+
+    def insert(self, name, temperature, role, image_path):
+        self.cursor.execute('''INSERT INTO ai_assistants VALUES (
+            NULL, ?, ?, ?, ?
+        )''', (name, temperature, role, image_path))
+        self.conn.commit()
+
+    def update(self, id, name, temperature, role, image_path):
+        self.cursor.execute('''UPDATE ai_assistants SET
+            name = ?,
+            temperature = ?,
+            role = ?,
+            image_path = ?
+            WHERE id = ?
+        ''', (name, temperature, role, image_path, id))
+        self.conn.commit()
+        
+    def update_from_name(self, name, temperature, role, image_path):
+        self.cursor.execute('''UPDATE ai_assistants SET
+            temperature = ?,
+            role = ?,
+            image_path = ?
+            WHERE name = ?
+        ''', (temperature, role, image_path, name))
+        self.conn.commit()
+
+    def delete(self, id):
+        self.cursor.execute('''DELETE FROM ai_assistants WHERE id = ?''', (id,))
+        self.conn.commit()
+
+    def delete_from_name(self, name):
+        self.cursor.execute('''DELETE FROM ai_assistants WHERE name = ?''', (name,))
+        self.conn.commit()
+
+    def get_all(self):
+        self.cursor.execute('''SELECT * FROM ai_assistants''')
+        return self.cursor.fetchall()
+    
+    def get_by_id(self, id):
+        self.cursor.execute('''SELECT * FROM ai_assistants WHERE id = ?''', (id,))
+        return self.cursor.fetchone()
+    
+    def get_by_name(self, name):
+        self.cursor.execute('''SELECT * FROM ai_assistants WHERE name = ?''', (name,))
+        return self.cursor.fetchone()
     

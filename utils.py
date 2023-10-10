@@ -202,3 +202,12 @@ user_template = '''
     <div class="message">{{MSG}}</div>
 </div>
 '''
+
+bot_template_creation = '''
+<div class="chat-message bot">
+    <div class="avatar">
+        <img src={{IMAGE}} style="max-height: 75px; max-width: 75px; border-radius: 25%; object-fit: cover;">
+    </div>
+    <div class="message">{{MSG}}</div>
+</div>
+'''
