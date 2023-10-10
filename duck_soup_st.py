@@ -527,7 +527,6 @@ class DuckSoup_st:
                         return name, temperature, role, image
     
     def ChatAgent(self):
-        # get current ai agent
         ai = self.ai_assistants_db.get_by_name(st.session_state.choosen_ai)
         name = ai[1]
         temperature = ai[2]
@@ -551,11 +550,9 @@ class DuckSoup_st:
             st.stop()
 
         # Set up the LLMChain, passing in memory
-        template = """You are an AI chatbot having a conversation with a human.
-
-        {history}
-        Human: {human_input}
-        AI: """
+        template = f"""Your role: {role}"""+""" {history}
+        Human: {human_input} """ + f"""
+        {name}""" 
         prompt = PromptTemplate(input_variables=["history", "human_input"], template=template)
         llm_chain = LLMChain(llm=OpenAI(openai_api_key=openai_api_key), prompt=prompt, memory=memory)
 
