@@ -13,17 +13,10 @@ import streamlit_antd_components as sac
 from streamlit_ace import st_ace
 from streamlit_ace import KEYBINDINGS
 from utils import get_random_title
-import streamlit.components.v1 as components
 from streamlit_calendar import calendar
 from dotenv import load_dotenv
-from PyPDF2 import PdfReader
-from langchain.text_splitter import CharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings, HuggingFaceInstructEmbeddings
-from langchain.vectorstores import FAISS
-from langchain.chat_models import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
-from langchain.chains import ConversationalRetrievalChain
-from utils import css, bot_template, user_template, bot_template_creation
+from utils import css, user_template, bot_template_creation
 from langchain.chains import LLMChain
 from langchain.llms import OpenAI
 from langchain.memory import ConversationBufferMemory
@@ -212,26 +205,30 @@ class DuckSoup_st:
         self.init_css()
         with st.form(key='text_editor'):
             c1,c2,c3 = st.columns([1,1,1])
-            if c1.form_submit_button('New', use_container_width=True):
-                self.OnNew(with_db)
-                st.experimental_rerun()
-            if c2.form_submit_button('Save',use_container_width=True):
-                self.OnSave(with_db)
-            if c3.form_submit_button('Delete', use_container_width=True):
-                self.OnDelete(with_db)
-                st.experimental_rerun()
+            space_new = c1.empty()
+            space_save = c2.empty()
+            space_delete = c3.empty()
 
             tab1,tab2 = st.tabs([f'Text Editor', f'Markdown Preview'])
 
             with tab1:
-                text = st_ace(placeholder=self.selected_file, value = self.open_selected_file(with_db), height=500)
+                text = st_ace(placeholder=self.selected_file, value = self.open_selected_file(with_db), height=500, auto_update=True, language='markdown', wrap = True)
             with tab2:
                 css_for_markdown = '''
                     <div class="markdown-text-container">
                     {{text}}
                 '''
                 st.markdown(css_for_markdown.replace('{{text}}',text), unsafe_allow_html=True)
-        self.text = text
+                self.text = text
+            if space_new.form_submit_button('New', use_container_width=True):
+                self.OnNew(with_db)
+                st.experimental_rerun()
+            if space_save.form_submit_button('Save',use_container_width=True):
+                self.OnSave(with_db)
+            if space_delete.form_submit_button('Delete', use_container_width=True):
+                self.OnDelete(with_db)
+                st.experimental_rerun()
+
 
     def OnNew(self, with_db = False):                     # When the user clicks on the NEW-BUTTON or presses Ctrl+N
         '''
