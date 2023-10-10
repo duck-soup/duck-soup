@@ -195,24 +195,58 @@ class DuckSoup_st:
                 content = f.read()
         else:
             # use the database
-            content = self.db.get_by_title(self.selected_file)[3]
-            if content == '':
-                # use emoji and title
-                content = self.db.get_by_title(self.selected_file)[1] + '\n' + self.db.get_by_title(self.selected_file)[2]
-        return content
+            note = self.db.get_by_title(self.selected_file)
+        return note
 
     def text_editor(self, with_db = False):
         self.init_css()
         with st.form(key='text_editor'):
+            note = self.open_selected_file(with_db)
+            id = note[0] if with_db else ''
+            emoji = note[1] if with_db else self.selected_file
+            title = note[2] if with_db else self.selected_file
+            content = note[3] if with_db else note
+            date = note[4] if with_db and note[4] != '' else datetime.datetime.now().date()
+            # transfomr date in datetime format
+            date_ = str(date).split('-')
+            try:
+                date = datetime.datetime(int(date_[0]), int(date_[1]), int(date_[2]))
+            except:
+                date = datetime.datetime.now()
+
+            last_modified = note[5] if with_db else ''
+            tags = note[6] if with_db else ''
+
             c1,c2,c3 = st.columns([1,1,1])
             space_new = c1.empty()
             space_save = c2.empty()
             space_delete = c3.empty()
 
+            c1,c2,c3 = st.columns([1,1,1])
+            with c1:
+                emoji = st.text_input('Emoji', value=emoji)
+            with c2:
+                title = st.text_input('Title', value=title)
+            with c3:
+                date_ = st.date_input('Date', value=date)
+            c1,c2,c3 = st.columns([1,1,1])
+            with c1:
+                time = st.time_input('Time', value=date)
+            with c2:
+                last_modified = st.text_input('Last Modified', value=last_modified)
+            with c3:
+                tags = st.text_input('Tags', value=tags)
+
+            self.title = title
+            self.emoji = emoji
+            self.date = date_ 
+            self.tags = tags
+
             tab1,tab2 = st.tabs([f'Text Editor', f'Markdown Preview'])
 
+            
             with tab1:
-                text = st_ace(placeholder=self.selected_file, value = self.open_selected_file(with_db), height=500, auto_update=True, language='markdown', wrap = True)
+                text = st_ace(placeholder=self.selected_file, value = content, height=500, auto_update=True, language='markdown', wrap = True)
             with tab2:
                 css_for_markdown = '''
                     <div class="markdown-text-container">
@@ -228,7 +262,6 @@ class DuckSoup_st:
             if space_delete.form_submit_button('Delete', use_container_width=True):
                 self.OnDelete(with_db)
                 st.experimental_rerun()
-
 
     def OnNew(self, with_db = False):                     # When the user clicks on the NEW-BUTTON or presses Ctrl+N
         '''
@@ -256,7 +289,7 @@ class DuckSoup_st:
                 st.error('No file selected')      
         else:
             # use the database
-            self.db.update(self.db.get_by_title(self.selected_file)[0], '', self.selected_file, self.text, '', '', '')
+            self.db.update(self.db.get_by_title(self.selected_file)[0], self.emoji, self.title, self.text, self.date, datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), self.tags)
             st.success('Saved')  
 
     def OnDelete(self, with_db = False):                  # When the user clicks on the DELETE BUTTON or presses Ctrl+D
