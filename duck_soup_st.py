@@ -283,7 +283,7 @@ class DuckSoup_st:
                 with c2:
                     self.openai_key = st.text_input('OpenAI Key', value=self.openai_key, type='password')
 
-                save_b = st.form_submit_button('Save')
+                save_b = st.form_submit_button('Save', use_container_width=True)
                 if save_b and not self.with_db:
                     self.configurations()
                     with open('config.yaml', 'w') as f:
@@ -476,6 +476,8 @@ class DuckSoup_st:
             return name, temperature, role, image
         
     def CreateAI(self):
+        st.write(st.session_state.choosen_ai if st.session_state.choosen_ai else 'No AI choosen')
+
         if self.ai_assistants_db.get_all() == []:
             self.OnNewAI()
         else:
@@ -485,6 +487,11 @@ class DuckSoup_st:
                 self.OnNewAI()
                 st.stop()
             else:
+                if choosen != st.session_state.choosen_ai:
+                    st.write('Changed')
+                    st.session_state.choosen_ai = choosen
+                    st.session_state.langchain_messages = []
+                    st.experimental_rerun()
                 # get ai from name 
                 ai = self.ai_assistants_db.get_by_name(choosen)
                 st.session_state.choosen_ai = choosen
@@ -572,9 +579,6 @@ class DuckSoup_st:
         # If user inputs a new prompt, generate and draw a new response
         if prompt := st.chat_input():
             response = llm_chain.run(prompt)
-        
-
-
     
         render_messages()
 
