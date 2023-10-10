@@ -25,12 +25,15 @@ from langchain.chains import ConversationalRetrievalChain
 from utils import css, bot_template, user_template
 from langchain.llms import HuggingFaceHub
 
+from database import DatabaseManager
+
 st.set_page_config(layout="wide")
 
 class DuckSoup_st:
     def __init__(self):
         load_dotenv()
         st.write(css, unsafe_allow_html=True)
+        self.db = DatabaseManager('notes.db')
 
         if "conversation" not in st.session_state:
             st.session_state.conversation = None
@@ -142,33 +145,45 @@ class DuckSoup_st:
 
         self.files = files
         return files
-    
-    def create_file_menu(self):
-        with st.sidebar:
-            menu = sac.menu([
-                sac.MenuItem('Docs', icon='lock', children=[sac.MenuItem(f'{file}', icon='card-text', tag=f'Tag{i}') for i,file in enumerate(self.files)]),
-                sac.MenuItem('Settings', icon='gear', children=[
-                    sac.MenuItem('AI', icon='robot'),
-                    sac.MenuItem('Vault', icon='lock'),
-                    sac.MenuItem('Theme', icon='brush'),
-                    sac.MenuItem('About', icon='info-circle'),
-                ]),
-                # add calendar
-                sac.MenuItem('Calendar', icon='calendar'),
-                    
-            ], open_all=True)
-        return menu
 
-    def open_selected_file(self):
-        with open(self.home_dir + '/' + self.selected_file, 'r') as f:
-            content = f.read()
+    def get_files_from_database(self):
+        self.files = [file[2] for file in self.db.get_all()]
+    
+    def create_file_menu(self, with_db = False):
+        icon_docs = 'folder' if not with_db else 'database'
+        if self.files != []:
+            with st.sidebar:
+                menu = sac.menu([
+                    sac.MenuItem('Docs', icon=icon_docs, children=[sac.MenuItem(f'{file}', icon='card-text', tag=f'Tag{i}') for i,file in enumerate(self.files)]),
+                    sac.MenuItem('Calendar', icon='calendar'),
+                    sac.MenuItem('Settings', icon='gear', children=[
+                        sac.MenuItem('AI', icon='robot'),
+                        sac.MenuItem('Vault', icon='lock'),
+                        sac.MenuItem('Theme', icon='brush'),
+                        sac.MenuItem('About', icon='info-circle'),
+                    ]),
+                    # add calendar
+                        
+                ], open_all=False, open_index=0)
+            return menu
+
+    def open_selected_file(self, with_db = False):
+        if not with_db:
+            with open(self.home_dir + '/' + self.selected_file, 'r') as f:
+                content = f.read()
+        else:
+            # use the database
+            content = self.db.get_by_title(self.selected_file)[3]
+            if content == '':
+                # use emoji and title
+                content = self.db.get_by_title(self.selected_file)[1] + '\n' + self.db.get_by_title(self.selected_file)[2]
         return content
 
-    def text_editor(self):
+    def text_editor(self, with_db = False):
         self.init_css()
         c1,c2 = st.tabs([f'Text Editor', f'Markdown Preview'])
         with c1:
-            text = st_ace(placeholder=self.selected_file, value = self.open_selected_file(), height=500)
+            text = st_ace(placeholder=self.selected_file, value = self.open_selected_file(with_db), height=500)
         with c2:
             css_for_markdown = '''
                 <div class="markdown-text-container">
@@ -177,28 +192,46 @@ class DuckSoup_st:
             st.markdown(css_for_markdown.replace('{{text}}',text), unsafe_allow_html=True)
         self.text = text
 
-    def OnNew(self):                     # When the user clicks on the NEW-BUTTON or presses Ctrl+N
+    def OnNew(self, with_db = False):                     # When the user clicks on the NEW-BUTTON or presses Ctrl+N
+        '''
+        It creates a new file in the home directory.
+        The name of the file is a random emoji and a random title.
+        '''
         emoj, titl = get_random_title(self.files)
-        with open(os.path.join(self.home_dir, titl +  '.txt'), 'w') as f:
-            f.write(emoj)
-            # add in the new line with the title
-            f.write('\n' + f"# {titl}" + '\n')
+        if not with_db:
+            with open(os.path.join(self.home_dir, titl +  '.txt'), 'w') as f:
+                f.write(emoj)
+                # add in the new line with the title
+                f.write('\n' + f"# {titl}" + '\n')
+        else:
+            # use the database
+            self.db.insert(emoj, titl, '', '', '', '')
         self.get_files_from_archive()
 
-    def OnSave(self):                    # When the user clicks on the SAVE BUTTON or presses Ctrl+S
-        try:
-            with open(os.path.join(self.home_dir, self.selected_file), 'w') as f:
-                f.write(self.text)
-            st.success('Saved')
-        except:
-            st.error('No file selected')        
+    def OnSave(self, with_db = False):                    # When the user clicks on the SAVE BUTTON or presses Ctrl+S
+        if not with_db:
+            try:
+                with open(os.path.join(self.home_dir, self.selected_file), 'w') as f:
+                    f.write(self.text)
+                st.success('Saved')
+            except:
+                st.error('No file selected')      
+        else:
+            # use the database
+            self.db.update(self.db.get_by_title(self.selected_file)[0], '', self.selected_file, self.text, '', '', '')
+            st.success('Saved')  
 
-    def OnDelete(self):                  # When the user clicks on the DELETE BUTTON or presses Ctrl+D
-        try:
-            os.remove(os.path.join(self.home_dir, self.selected_file))
+    def OnDelete(self, with_db = False):                  # When the user clicks on the DELETE BUTTON or presses Ctrl+D
+        if with_db:
+            self.db.delete(self.selected_file)
             st.success('Deleted')
-        except:
-            st.error('No file selected')
+            return
+        else:
+            try:
+                os.remove(os.path.join(self.home_dir, self.selected_file))
+                st.success('Deleted')
+            except:
+                st.error('No file selected')
 
     def Onsettings(self):
         if self.selected_file == 'AI':
@@ -397,30 +430,42 @@ class DuckSoup_st:
     
     def run(self):  
         self.configurations()
-        self.get_files_from_archive()
-        st.write(self.home_dir)
-        selected = self.create_file_menu()
+        with st.sidebar:
+            db_or_file =  sac.buttons([
+                sac.ButtonsItem(label='Database', icon='database'),
+                sac.ButtonsItem(label='Folder', icon='folder'),
+            ])
+        with_db = True if db_or_file == 'Database' else False
+        if db_or_file == 'Database':
+            self.get_files_from_database()
+        else:
+            self.get_files_from_archive()
+
+        selected = self.create_file_menu(with_db)
         commands = ['AI', 'Vault', 'Theme', 'About', 'Calendar']
-        self.selected_file =  selected if selected in self.files else self.files[0] if selected not in commands else selected
-        st.write(self.selected_file)
+        try:
+            self.selected_file =  selected if selected in self.files else self.files[0] if selected not in commands else selected
+            st.write(self.selected_file)
+        except:
+            self.selected_file = self.files[0] if self.files != [] else 'No files'
         
         if selected in commands and selected != 'Calendar':
             self.Onsettings()
         elif selected == 'Calendar':
             self.OnCalendar()
+        c1,c2,c3 = st.columns([1,1,1])
+        if c1.button('New', key='new', use_container_width=True):
+            self.OnNew(with_db)
+            st.experimental_rerun()
+        if c2.button('Save', key='save', use_container_width=True):
+            self.OnSave(with_db)
+        if c3.button('Delete', key='delete', use_container_width=True):
+            self.OnDelete(with_db)
+            st.experimental_rerun()
 
         if selected in self.files:
-            self.text_editor()
-            c1,c2 = st.sidebar.columns([1,1])
-            if c1.button('New', key='new', use_container_width=True):
-                self.OnNew()
-                st.experimental_rerun()
-            if c2.button('Save', key='save', use_container_width=True):
-                self.OnSave()
-            if st.sidebar.button('Delete', key='delete', use_container_width=True):
-                self.OnDelete()
-                st.experimental_rerun()
-            self.ChatFeatures()
+            self.text_editor(with_db)
+        self.ChatFeatures()
 
 
 if __name__ == '''__main__''':
